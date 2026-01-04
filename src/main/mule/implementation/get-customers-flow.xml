@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+        http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+
+    <!-- ============================================ -->
+    <!-- GET CUSTOMERS FLOW                           -->
+    <!-- Retrieves customers from Salesforce          -->
+    <!-- Supports filtering by accountId, email,      -->
+    <!-- and lastModifiedAfter                        -->
+    <!-- ============================================ -->
+    <flow name="get-customers-flow" doc:name="Get Customers Flow">
+        
+        <!-- Set operation context for logging -->
+        <set-variable variableName="sfOperation" value="query" doc:name="Set SF Operation"/>
+        <set-variable variableName="sfObject" value="Account" doc:name="Set SF Object"/>
+        <flow-ref name="logging-salesforce-operation-subflow" doc:name="Log Salesforce Operation"/>
+        
+        <!-- Extract query parameters -->
+        <set-variable variableName="salesforceAccountId" value="#[attributes.queryParams.salesforceAccountId default null]" doc:name="Set Account ID Filter"/>
+        <set-variable variableName="emailFilter" value="#[attributes.queryParams.email default null]" doc:name="Set Email Filter"/>
+        <set-variable variableName="lastModifiedAfter" value="#[attributes.queryParams.lastModifiedAfter default null]" doc:name="Set Last Modified Filter"/>
+        
+        <!-- Build dynamic SOQL query -->
+        <ee:transform doc:name="Build SOQL Query">
+            <ee:variables>
+                <ee:set-variable variableName="soqlQuery"><![CDATA[%dw 2.0
+output application/java
+var baseQuery = "SELECT Id, Name, Industry, Type, Status__c, AccountStatus__c, CreatedDate, LastModifiedDate, (SELECT Id, FirstName, LastName, Email, Phone FROM Contacts ORDER BY CreatedDate DESC LIMIT 1) FROM Account"
+var conditions = []
+var accountIdCondition = if (vars.salesforceAccountId != null) "Id = '" ++ vars.salesforceAccountId ++ "'" else null
+var emailCondition = if (vars.emailFilter != null) "Id IN (SELECT AccountId FROM Contact WHERE Email = '" ++ vars.emailFilter ++ "')" else null
+var lastModifiedCondition = if (vars.lastModifiedAfter != null) "LastModifiedDate > " ++ vars.lastModifiedAfter else null
+var allConditions = [accountIdCondition, emailCondition, lastModifiedCondition] filter ($ != null)
+---
+if (isEmpty(allConditions))
+    baseQuery ++ " ORDER BY LastModifiedDate DESC LIMIT 100"
+else
+    baseQuery ++ " WHERE " ++ (allConditions joinBy " AND ") ++ " ORDER BY LastModifiedDate DESC LIMIT 100"]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        
+        <!-- Query Salesforce -->
+        <salesforce:query config-ref="Salesforce_Config" doc:name="Query Salesforce Accounts">
+            <salesforce:salesforce-query><![CDATA[#[vars.soqlQuery]]]></salesforce:salesforce-query>
+        </salesforce:query>
+        
+        <!-- Transform to API response format -->
+        <flow-ref name="map-salesforce-accounts-subflow" doc:name="Map Salesforce Accounts"/>
+        
+        <!-- Set business event for logging -->
+        <set-variable variableName="businessEvent" value="CUSTOMERS_RETRIEVED" doc:name="Set Business Event"/>
+        <set-variable variableName="eventDetails" value="#['count=' ++ sizeOf(payload)]" doc:name="Set Event Details"/>
+        <flow-ref name="logging-business-event-subflow" doc:name="Log Business Event"/>
+        
+    </flow>
+
+</mule>

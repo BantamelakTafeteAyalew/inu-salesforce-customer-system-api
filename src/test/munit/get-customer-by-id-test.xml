@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- ============================================ -->
+    <!-- GET CUSTOMER BY ID TEST SUITE                -->
+    <!-- ============================================ -->
+    <munit:config name="get-customer-by-id-test.xml"/>
+
+    <!-- ============================================ -->
+    <!-- TEST: Get Customer By ID - Success           -->
+    <!-- ============================================ -->
+    <munit:test name="get-customer-by-id-success-test" 
+                description="Test GET /customers/{id} returns customer successfully">
+        
+        <munit:behavior>
+            <!-- Set URI parameters -->
+            <munit-tools:set-event>
+                <munit-tools:attributes value='#[{
+                    "uriParams": {
+                        "salesforceAccountId": "001XXXXXXXXXXXXXXX"
+                    }
+                }]'/>
+            </munit-tools:set-event>
+            
+            <!-- Mock Salesforce Query -->
+            <munit-tools:mock-when processor="salesforce:query">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Query Salesforce Account"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value='#[[{
+                        "Id": "001XXXXXXXXXXXXXXX",
+                        "Name": "Acme Corporation",
+                        "Industry": "Technology",
+                        "Type": "Customer - Direct",
+                        "Status__c": "Active",
+                        "CreatedDate": "2024-01-15T10:30:00.000Z",
+                        "LastModifiedDate": "2024-06-20T14:45:00.000Z",
+                        "Contacts": {
+                            "records": [{
+                                "Id": "003XXXXXXXXXXXXXXX",
+                                "FirstName": "John",
+                                "LastName": "Doe",
+                                "Email": "john.doe@acme.com",
+                                "Phone": "+1-555-555-5555"
+                            }]
+                        }
+                    }]]'/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="get-customer-by-id-flow" doc:name="Execute Get Customer By ID Flow"/>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.salesforceAccountId]" is="#[MunitTools::equalTo('001XXXXXXXXXXXXXXX')]" doc:name="Assert Account ID"/>
+            <munit-tools:assert-that expression="#[payload.accountName]" is="#[MunitTools::equalTo('Acme Corporation')]" doc:name="Assert Account Name"/>
+            <munit-tools:assert-that expression="#[payload.industry]" is="#[MunitTools::equalTo('Technology')]" doc:name="Assert Industry"/>
+            <munit-tools:assert-that expression="#[payload.customerType]" is="#[MunitTools::equalTo('B2B')]" doc:name="Assert Customer Type"/>
+            <munit-tools:assert-that expression="#[payload.primaryContact.firstName]" is="#[MunitTools::equalTo('John')]" doc:name="Assert Contact First Name"/>
+            <munit-tools:assert-that expression="#[payload.primaryContact.lastName]" is="#[MunitTools::equalTo('Doe')]" doc:name="Assert Contact Last Name"/>
+        </munit:validation>
+        
+    </munit:test>
+
+    <!-- ============================================ -->
+    <!-- TEST: Get Customer By ID - Not Found         -->
+    <!-- ============================================ -->
+    <munit:test name="get-customer-by-id-not-found-test" 
+                description="Test GET /customers/{id} returns 404 when customer not found"
+                expectedErrorType="APP:NOT_FOUND">
+        
+        <munit:behavior>
+            <!-- Set URI parameters -->
+            <munit-tools:set-event>
+                <munit-tools:attributes value='#[{
+                    "uriParams": {
+                        "salesforceAccountId": "001NONEXISTENT0000"
+                    }
+                }]'/>
+            </munit-tools:set-event>
+            
+            <!-- Mock Salesforce Query returning empty -->
+            <munit-tools:mock-when processor="salesforce:query">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Query Salesforce Account"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[[]]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="get-customer-by-id-flow" doc:name="Execute Get Customer By ID Flow"/>
+        </munit:execution>
+        
+    </munit:test>
+
+    <!-- ============================================ -->
+    <!-- TEST: Get Customer By ID - Invalid ID Format -->
+    <!-- ============================================ -->
+    <munit:test name="get-customer-by-id-invalid-id-test" 
+                description="Test GET /customers/{id} returns 400 for invalid ID format"
+                expectedErrorType="APP:VALIDATION">
+        
+        <munit:behavior>
+            <!-- Set invalid URI parameters -->
+            <munit-tools:set-event>
+                <munit-tools:attributes value='#[{
+                    "uriParams": {
+                        "salesforceAccountId": "invalid"
+                    }
+                }]'/>
+            </munit-tools:set-event>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="get-customer-by-id-flow" doc:name="Execute Get Customer By ID Flow"/>
+        </munit:execution>
+        
+    </munit:test>
+
+    <!-- ============================================ -->
+    <!-- TEST: Get Customer By ID - Salesforce Error  -->
+    <!-- ============================================ -->
+    <munit:test name="get-customer-by-id-salesforce-error-test" 
+                description="Test GET /customers/{id} handles Salesforce timeout error"
+                expectedErrorType="SALESFORCE:TIMEOUT">
+        
+        <munit:behavior>
+            <!-- Set URI parameters -->
+            <munit-tools:set-event>
+                <munit-tools:attributes value='#[{
+                    "uriParams": {
+                        "salesforceAccountId": "001XXXXXXXXXXXXXXX"
+                    }
+                }]'/>
+            </munit-tools:set-event>
+            
+            <!-- Mock Salesforce Query throwing timeout error -->
+            <munit-tools:mock-when processor="salesforce:query">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Query Salesforce Account"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:error typeId="SALESFORCE:TIMEOUT" exception="#[java!java::lang::RuntimeException::new('Request timed out')]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="get-customer-by-id-flow" doc:name="Execute Get Customer By ID Flow"/>
+        </munit:execution>
+        
+    </munit:test>
+
+    <!-- ============================================ -->
+    <!-- TEST: Get Customer Without Contact           -->
+    <!-- ============================================ -->
+    <munit:test name="get-customer-by-id-no-contact-test" 
+                description="Test GET /customers/{id} handles customer without primary contact">
+        
+        <munit:behavior>
+            <!-- Set URI parameters -->
+            <munit-tools:set-event>
+                <munit-tools:attributes value='#[{
+                    "uriParams": {
+                        "salesforceAccountId": "001XXXXXXXXXXXXXXX"
+                    }
+                }]'/>
+            </munit-tools:set-event>
+            
+            <!-- Mock Salesforce Query without contacts -->
+            <munit-tools:mock-when processor="salesforce:query">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Query Salesforce Account"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value='#[[{
+                        "Id": "001XXXXXXXXXXXXXXX",
+                        "Name": "Acme Corporation",
+                        "Industry": "Technology",
+                        "Type": "Customer - Direct",
+                        "Status__c": "Active",
+                        "CreatedDate": "2024-01-15T10:30:00.000Z",
+                        "LastModifiedDate": "2024-06-20T14:45:00.000Z",
+                        "Contacts": {
+                            "records": []
+                        }
+                    }]]'/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="get-customer-by-id-flow" doc:name="Execute Get Customer By ID Flow"/>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.salesforceAccountId]" is="#[MunitTools::equalTo('001XXXXXXXXXXXXXXX')]" doc:name="Assert Account ID"/>
+            <munit-tools:assert-that expression="#[payload.primaryContact]" is="#[MunitTools::nullValue()]" doc:name="Assert Primary Contact is null"/>
+        </munit:validation>
+        
+    </munit:test>
+
+</mule>

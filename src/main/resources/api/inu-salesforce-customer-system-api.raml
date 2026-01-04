@@ -1,0 +1,186 @@
+#%RAML 1.0
+title: Salesforce Customer System API
+version: v1
+baseUri: https://api.company.com/salesforce/customer/{version}
+mediaType: application/json
+protocols:
+  - HTTPS
+
+documentation:
+  - title: API Purpose
+    content: |
+      The Salesforce Customer System API provides standardized access
+      to customer-related data stored in Salesforce.
+      
+      This API abstracts Salesforce-specific objects and queries
+      and exposes customer information in a consistent format
+      for consumption by MuleSoft Process APIs.
+
+  - title: Source System
+    content: |
+      System of Record: Salesforce CRM
+      Objects Exposed:
+      - Account
+      - Contact
+      - Lead (optional)
+
+# =========================
+# SECURITY
+# =========================
+securitySchemes:
+  client-id-auth:
+    type: x-client-credentials
+    description: Client ID and Client Secret enforcement via Anypoint API Manager
+    describedBy:
+      headers:
+        client_id:
+          type: string
+          required: true
+        client_secret:
+          type: string
+          required: true
+      responses:
+        401:
+          description: Unauthorized
+
+securedBy:
+  - client-id-auth
+
+# =========================
+# TYPES
+# =========================
+types:
+  SalesforceCustomer: !include types/SalesforceCustomer.raml
+  ErrorResponse: !include types/ErrorResponse.raml
+
+# =========================
+# RESOURCES
+# =========================
+
+/customers:
+  description: |
+    Salesforce customer resources derived from Account and Contact objects.
+
+  get:
+    description: |
+      Retrieve Salesforce customers.
+      Supports filtered queries typically used by Process APIs.
+    queryParameters:
+      salesforceAccountId?:
+        type: string
+        description: Filter by Salesforce Account Id
+      email?:
+        type: string
+        description: Filter by primary contact email
+      lastModifiedAfter?:
+        type: datetime
+        description: Retrieve customers modified after a specific timestamp
+    responses:
+      200:
+        body:
+          application/json:
+            type: SalesforceCustomer[]
+            example: !include examples/customers-example.json
+      400:
+        body:
+          application/json:
+            type: ErrorResponse
+            example: !include examples/error-example.json
+      500:
+        body:
+          application/json:
+            type: ErrorResponse
+            example: !include examples/error-example.json
+
+  post:
+    description: |
+      Create a new Salesforce customer (Account and primary Contact).
+      Used by onboarding or synchronization processes.
+    body:
+      application/json:
+        type: SalesforceCustomer
+        example: !include examples/customer-example.json
+    responses:
+      201:
+        description: Customer created in Salesforce
+        body:
+          application/json:
+            type: object
+            properties:
+              salesforceAccountId:
+                type: string
+              message:
+                type: string
+      400:
+        body:
+          application/json:
+            type: ErrorResponse
+            example: !include examples/error-example.json
+      500:
+        body:
+          application/json:
+            type: ErrorResponse
+            example: !include examples/error-example.json
+
+/customers/{salesforceAccountId}:
+  uriParameters:
+    salesforceAccountId:
+      type: string
+      required: true
+      description: Salesforce Account Id
+
+  get:
+    description: Retrieve a single Salesforce customer by Account Id
+    responses:
+      200:
+        body:
+          application/json:
+            type: SalesforceCustomer
+            example: !include examples/customer-example.json
+      404:
+        body:
+          application/json:
+            type: ErrorResponse
+            example: !include examples/error-example.json
+      500:
+        body:
+          application/json:
+            type: ErrorResponse
+            example: !include examples/error-example.json
+
+  patch:
+    description: |
+      Update Salesforce customer attributes.
+      Partial updates supported.
+    body:
+      application/json:
+        type: object
+        example:
+          accountStatus: "Inactive"
+          industry: "Finance"
+    responses:
+      200:
+        description: Customer updated successfully
+        body:
+          application/json:
+            type: object
+            properties:
+              salesforceAccountId:
+                type: string
+              message:
+                type: string
+      400:
+        body:
+          application/json:
+            type: ErrorResponse
+            example: !include examples/error-example.json
+      404:
+        body:
+          application/json:
+            type: ErrorResponse
+            example: !include examples/error-example.json
+      500:
+        body:
+          application/json:
+            type: ErrorResponse
+            example: !include examples/error-example.json

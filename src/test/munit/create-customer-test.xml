@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- ============================================ -->
+    <!-- CREATE CUSTOMER TEST SUITE                   -->
+    <!-- ============================================ -->
+    <munit:config name="create-customer-test.xml"/>
+
+    <!-- ============================================ -->
+    <!-- TEST: Create Customer - Success              -->
+    <!-- ============================================ -->
+    <munit:test name="create-customer-success-test" 
+                description="Test POST /customers creates customer successfully">
+        
+        <munit:behavior>
+            <!-- Set request payload -->
+            <munit-tools:set-event>
+                <munit-tools:payload value='#[{
+                    "accountName": "New Customer Corp",
+                    "accountStatus": "Active",
+                    "industry": "Technology",
+                    "customerType": "B2B",
+                    "primaryContact": {
+                        "firstName": "Jane",
+                        "lastName": "Smith",
+                        "email": "jane.smith@newcustomer.com",
+                        "phone": "+1-555-123-4567"
+                    }
+                }]'/>
+            </munit-tools:set-event>
+            
+            <!-- Mock Salesforce Create Account -->
+            <munit-tools:mock-when processor="salesforce:create">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Create Salesforce Account"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value='#[[{
+                        "success": true,
+                        "id": "001NEWACCOUNT0001",
+                        "errors": []
+                    }]]'/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+            
+            <!-- Mock Salesforce Create Contact -->
+            <munit-tools:mock-when processor="salesforce:create">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Create Salesforce Contact"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value='#[[{
+                        "success": true,
+                        "id": "003NEWCONTACT0001",
+                        "errors": []
+                    }]]'/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="create-customer-flow" doc:name="Execute Create Customer Flow"/>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.salesforceAccountId]" is="#[MunitTools::equalTo('001NEWACCOUNT0001')]" doc:name="Assert Account ID returned"/>
+            <munit-tools:assert-that expression="#[payload.message]" is="#[MunitTools::containsString('successfully')]" doc:name="Assert success message"/>
+            <munit-tools:assert-that expression="#[vars.httpStatus]" is="#[MunitTools::equalTo(201)]" doc:name="Assert HTTP Status 201"/>
+        </munit:validation>
+        
+    </munit:test>
+
+    <!-- ============================================ -->
+    <!-- TEST: Create Customer - Without Contact      -->
+    <!-- ============================================ -->
+    <munit:test name="create-customer-without-contact-test" 
+                description="Test POST /customers creates customer without primary contact">
+        
+        <munit:behavior>
+            <!-- Set request payload without contact -->
+            <munit-tools:set-event>
+                <munit-tools:payload value='#[{
+                    "accountName": "Simple Corp",
+                    "accountStatus": "Active",
+                    "industry": "Finance",
+                    "customerType": "B2B"
+                }]'/>
+            </munit-tools:set-event>
+            
+            <!-- Mock Salesforce Create Account -->
+            <munit-tools:mock-when processor="salesforce:create">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Create Salesforce Account"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value='#[[{
+                        "success": true,
+                        "id": "001SIMPLEACCT0001",
+                        "errors": []
+                    }]]'/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="create-customer-flow" doc:name="Execute Create Customer Flow"/>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.salesforceAccountId]" is="#[MunitTools::equalTo('001SIMPLEACCT0001')]" doc:name="Assert Account ID returned"/>
+            <munit-tools:assert-that expression="#[vars.httpStatus]" is="#[MunitTools::equalTo(201)]" doc:name="Assert HTTP Status 201"/>
+        </munit:validation>
+        
+    </munit:test>
+
+    <!-- ============================================ -->
+    <!-- TEST: Create Customer - Validation Error     -->
+    <!-- ============================================ -->
+    <munit:test name="create-customer-validation-error-test" 
+                description="Test POST /customers returns 400 when account name is missing"
+                expectedErrorType="APP:VALIDATION">
+        
+        <munit:behavior>
+            <!-- Set request payload without account name -->
+            <munit-tools:set-event>
+                <munit-tools:payload value='#[{
+                    "accountStatus": "Active",
+                    "industry": "Technology"
+                }]'/>
+            </munit-tools:set-event>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="create-customer-flow" doc:name="Execute Create Customer Flow"/>
+        </munit:execution>
+        
+    </munit:test>
+
+    <!-- ============================================ -->
+    <!-- TEST: Create Customer - Salesforce Error     -->
+    <!-- ============================================ -->
+    <munit:test name="create-customer-salesforce-error-test" 
+                description="Test POST /customers handles Salesforce creation failure"
+                expectedErrorType="APP:VALIDATION">
+        
+        <munit:behavior>
+            <!-- Set request payload -->
+            <munit-tools:set-event>
+                <munit-tools:payload value='#[{
+                    "accountName": "Failed Corp",
+                    "accountStatus": "Active"
+                }]'/>
+            </munit-tools:set-event>
+            
+            <!-- Mock Salesforce Create Account with failure -->
+            <munit-tools:mock-when processor="salesforce:create">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Create Salesforce Account"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value='#[[{
+                        "success": false,
+                        "id": null,
+                        "errors": [{
+                            "statusCode": "REQUIRED_FIELD_MISSING",
+                            "message": "Required field is missing"
+                        }]
+                    }]]'/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="create-customer-flow" doc:name="Execute Create Customer Flow"/>
+        </munit:execution>
+        
+    </munit:test>
+
+    <!-- ============================================ -->
+    <!-- TEST: Create Customer - Connectivity Error   -->
+    <!-- ============================================ -->
+    <munit:test name="create-customer-connectivity-error-test" 
+                description="Test POST /customers handles Salesforce connectivity error"
+                expectedErrorType="SALESFORCE:CONNECTIVITY">
+        
+        <munit:behavior>
+            <!-- Set request payload -->
+            <munit-tools:set-event>
+                <munit-tools:payload value='#[{
+                    "accountName": "Test Corp",
+                    "accountStatus": "Active"
+                }]'/>
+            </munit-tools:set-event>
+            
+            <!-- Mock Salesforce Create Account throwing connectivity error -->
+            <munit-tools:mock-when processor="salesforce:create">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Create Salesforce Account"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:error typeId="SALESFORCE:CONNECTIVITY" exception="#[java!java::lang::RuntimeException::new('Connection failed')]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="create-customer-flow" doc:name="Execute Create Customer Flow"/>
+        </munit:execution>
+        
+    </munit:test>
+
+</mule>

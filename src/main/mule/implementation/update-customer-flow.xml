@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+        http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+
+    <!-- ============================================ -->
+    <!-- UPDATE CUSTOMER FLOW                         -->
+    <!-- Updates Account attributes in Salesforce    -->
+    <!-- Supports partial updates                     -->
+    <!-- ============================================ -->
+    <flow name="update-customer-flow" doc:name="Update Customer Flow">
+        
+        <!-- Extract and validate Account ID -->
+        <set-variable variableName="salesforceAccountId" value="#[attributes.uriParams.salesforceAccountId]" doc:name="Set Account ID"/>
+        <set-variable variableName="updateRequest" value="#[payload]" doc:name="Store Update Request"/>
+        <flow-ref name="validate-account-id-subflow" doc:name="Validate Account ID"/>
+        
+        <!-- Set operation context for logging -->
+        <set-variable variableName="sfOperation" value="update" doc:name="Set SF Operation"/>
+        <set-variable variableName="sfObject" value="Account" doc:name="Set SF Object"/>
+        <flow-ref name="logging-salesforce-operation-subflow" doc:name="Log Salesforce Operation"/>
+        
+        <!-- First verify the account exists -->
+        <salesforce:query config-ref="Salesforce_Config" doc:name="Check Account Exists">
+            <salesforce:salesforce-query><![CDATA[SELECT Id FROM Account WHERE Id = ':accountId']]></salesforce:salesforce-query>
+            <salesforce:parameters><![CDATA[#[{
+    accountId: vars.salesforceAccountId
+}]]]></salesforce:parameters>
+        </salesforce:query>
+        
+        <!-- Check if customer exists -->
+        <choice doc:name="Check Customer Exists">
+            <when expression="#[isEmpty(payload)]">
+                <raise-error type="APP:NOT_FOUND" description="#['Customer with ID ' ++ vars.salesforceAccountId ++ ' not found in Salesforce']" doc:name="Raise Not Found Error"/>
+            </when>
+            <otherwise>
+                
+                <!-- Transform request to Salesforce Account update format -->
+                <ee:transform doc:name="Transform to Salesforce Update">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+var customerTypeMapping = {
+    "B2B": "Customer - Direct",
+    "B2C": "Consumer"
+}
+var updateData = vars.updateRequest
+---
+[{
+    Id: vars.salesforceAccountId
+} ++ (if (updateData.accountName?) {Name: updateData.accountName} else {})
+  ++ (if (updateData.industry?) {Industry: updateData.industry} else {})
+  ++ (if (updateData.customerType? and updateData.customerType != null) {"Type": customerTypeMapping[updateData.customerType as String]} else {})
+  ++ (if (updateData.accountStatus?) {Status__c: updateData.accountStatus} else {})]]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+                
+                <!-- Update Account in Salesforce -->
+                <salesforce:update type="Account" config-ref="Salesforce_Config" doc:name="Update Salesforce Account">
+                    <salesforce:records>#[payload]</salesforce:records>
+                </salesforce:update>
+                
+                <!-- Store update result -->
+                <set-variable variableName="updateResult" value="#[payload[0]]" doc:name="Store Update Result"/>
+                
+                <!-- Check if update was successful -->
+                <choice doc:name="Check Update Success">
+                    <when expression="#[vars.updateResult.success == true]">
+                        
+                        <!-- Build success response -->
+                        <ee:transform doc:name="Build Success Response">
+                            <ee:message>
+                                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    salesforceAccountId: vars.salesforceAccountId,
+    message: "Customer updated successfully in Salesforce"
+}]]></ee:set-payload>
+                            </ee:message>
+                            <ee:variables>
+                                <ee:set-variable variableName="httpStatus"><![CDATA[200]]></ee:set-variable>
+                            </ee:variables>
+                        </ee:transform>
+                        
+                        <!-- Set business event for logging -->
+                        <set-variable variableName="businessEvent" value="CUSTOMER_UPDATED" doc:name="Set Business Event"/>
+                        <set-variable variableName="eventDetails" value="#['accountId=' ++ vars.salesforceAccountId]" doc:name="Set Event Details"/>
+                        <flow-ref name="logging-business-event-subflow" doc:name="Log Business Event"/>
+                        
+                    </when>
+                    <otherwise>
+                        <!-- Update failed -->
+                        <raise-error type="APP:VALIDATION" description="#['Failed to update customer: ' ++ (vars.updateResult.errors[0].message default 'Unknown error')]" doc:name="Raise Update Error"/>
+                    </otherwise>
+                </choice>
+                
+            </otherwise>
+        </choice>
+        
+    </flow>
+
+</mule>

@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+        http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+
+    <!-- ============================================ -->
+    <!-- CREATE CUSTOMER FLOW                         -->
+    <!-- Creates Account and Contact in Salesforce    -->
+    <!-- ============================================ -->
+    <flow name="create-customer-flow" doc:name="Create Customer Flow">
+        
+        <!-- Store original request -->
+        <set-variable variableName="originalRequest" value="#[payload]" doc:name="Store Original Request"/>
+        
+        <!-- Validate request -->
+        <flow-ref name="validate-create-customer-request-subflow" doc:name="Validate Request"/>
+        
+        <!-- Set operation context for logging -->
+        <set-variable variableName="sfOperation" value="create" doc:name="Set SF Operation"/>
+        <set-variable variableName="sfObject" value="Account" doc:name="Set SF Object"/>
+        <flow-ref name="logging-salesforce-operation-subflow" doc:name="Log Salesforce Operation"/>
+        
+        <!-- Transform request to Salesforce Account format -->
+        <ee:transform doc:name="Transform to Salesforce Account">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+var customerTypeMapping = {
+    "B2B": "Customer - Direct",
+    "B2C": "Consumer"
+}
+---
+[{
+    Name: vars.originalRequest.accountName,
+    Industry: vars.originalRequest.industry default null,
+    "Type": customerTypeMapping[vars.originalRequest.customerType] default null,
+    Status__c: vars.originalRequest.accountStatus default "Active"
+}]]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        
+        <!-- Create Account in Salesforce -->
+        <salesforce:create type="Account" config-ref="Salesforce_Config" doc:name="Create Salesforce Account">
+            <salesforce:records>#[payload]</salesforce:records>
+        </salesforce:create>
+        
+        <!-- Store Account creation result -->
+        <set-variable variableName="accountResult" value="#[payload[0]]" doc:name="Store Account Result"/>
+        
+        <!-- Check if Account creation was successful -->
+        <choice doc:name="Check Account Creation Success">
+            <when expression="#[vars.accountResult.success == true]">
+                
+                <!-- Create Contact if primary contact info provided -->
+                <choice doc:name="Check Primary Contact Provided">
+                    <when expression="#[vars.originalRequest.primaryContact != null and !isEmpty(vars.originalRequest.primaryContact.lastName default '')]">
+                        
+                        <!-- Transform to Salesforce Contact format -->
+                        <ee:transform doc:name="Transform to Salesforce Contact">
+                            <ee:message>
+                                <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+[{
+    AccountId: vars.accountResult.id,
+    FirstName: vars.originalRequest.primaryContact.firstName default null,
+    LastName: vars.originalRequest.primaryContact.lastName,
+    Email: vars.originalRequest.primaryContact.email default null,
+    Phone: vars.originalRequest.primaryContact.phone default null
+}]]]></ee:set-payload>
+                            </ee:message>
+                        </ee:transform>
+                        
+                        <!-- Create Contact in Salesforce -->
+                        <salesforce:create type="Contact" config-ref="Salesforce_Config" doc:name="Create Salesforce Contact">
+                            <salesforce:records>#[payload]</salesforce:records>
+                        </salesforce:create>
+                        
+                        <set-variable variableName="contactResult" value="#[payload[0]]" doc:name="Store Contact Result"/>
+                        
+                    </when>
+                </choice>
+                
+                <!-- Build success response -->
+                <ee:transform doc:name="Build Success Response">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    salesforceAccountId: vars.accountResult.id,
+    message: "Customer created successfully in Salesforce"
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus"><![CDATA[201]]></ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+                
+                <!-- Set business event for logging -->
+                <set-variable variableName="businessEvent" value="CUSTOMER_CREATED" doc:name="Set Business Event"/>
+                <set-variable variableName="eventDetails" value="#['accountId=' ++ vars.accountResult.id]" doc:name="Set Event Details"/>
+                <flow-ref name="logging-business-event-subflow" doc:name="Log Business Event"/>
+                
+            </when>
+            <otherwise>
+                <!-- Account creation failed -->
+                <raise-error type="APP:VALIDATION" description="#['Failed to create customer: ' ++ (vars.accountResult.errors[0].message default 'Unknown error')]" doc:name="Raise Creation Error"/>
+            </otherwise>
+        </choice>
+        
+    </flow>
+
+</mule>

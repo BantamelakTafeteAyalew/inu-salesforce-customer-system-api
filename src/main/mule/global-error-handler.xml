@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- ============================================ -->
+    <!-- GLOBAL ERROR HANDLER                         -->
+    <!-- Centralized error handling for all flows     -->
+    <!-- ============================================ -->
+    <error-handler name="global-error-handler" doc:name="Global Error Handler">
+        
+        <!-- ============================================ -->
+        <!-- CLIENT ERRORS - 4xx                          -->
+        <!-- ============================================ -->
+        
+        <!-- APIKIT: Bad Request -->
+        <on-error-propagate type="APIKIT:BAD_REQUEST" doc:name="On Error - Bad Request">
+            <ee:transform doc:name="Transform Bad Request Error">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    correlationId: correlationId,
+    errorCode: "CLIENT:VALIDATION",
+    message: error.description default "Invalid request format or parameters",
+    timestamp: now()
+}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables>
+                    <ee:set-variable variableName="httpStatus"><![CDATA[400]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            <flow-ref name="logging-error-subflow" doc:name="Log Error"/>
+        </on-error-propagate>
+
+        <!-- APIKIT: Not Found -->
+        <on-error-propagate type="APIKIT:NOT_FOUND" doc:name="On Error - Not Found">
+            <ee:transform doc:name="Transform Not Found Error">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    correlationId: correlationId,
+    errorCode: "CLIENT:NOT_FOUND",
+    message: error.description default "The requested resource was not found",
+    timestamp: now()
+}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables>
+                    <ee:set-variable variableName="httpStatus"><![CDATA[404]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            <flow-ref name="logging-error-subflow" doc:name="Log Error"/>
+        </on-error-propagate>
+
+        <!-- APIKIT: Method Not Allowed -->
+        <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED" doc:name="On Error - Method Not Allowed">
+            <ee:transform doc:name="Transform Method Not Allowed Error">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    correlationId: correlationId,
+    errorCode: "CLIENT:METHOD_NOT_ALLOWED",
+    message: error.description default "HTTP method not allowed for this resource",
+    timestamp: now()
+}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables>
+                    <ee:set-variable variableName="httpStatus"><![CDATA[405]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            <flow-ref name="logging-error-subflow" doc:name="Log Error"/>
+        </on-error-propagate>
+
+        <!-- APIKIT: Unsupported Media Type -->
+        <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE" doc:name="On Error - Unsupported Media Type">
+            <ee:transform doc:name="Transform Unsupported Media Type Error">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    correlationId: correlationId,
+    errorCode: "CLIENT:UNSUPPORTED_MEDIA_TYPE",
+    message: error.description default "Content type not supported",
+    timestamp: now()
+}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables>
+                    <ee:set-variable variableName="httpStatus"><![CDATA[415]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            <flow-ref name="logging-error-subflow" doc:name="Log Error"/>
+        </on-error-propagate>
+
+        <!-- Security/Authentication Errors -->
+        <on-error-propagate type="HTTP:UNAUTHORIZED, MULE:SECURITY" doc:name="On Error - Unauthorized">
+            <ee:transform doc:name="Transform Unauthorized Error">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    correlationId: correlationId,
+    errorCode: "CLIENT:SECURITY",
+    message: "Authentication failed - Invalid or missing credentials",
+    timestamp: now()
+}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables>
+                    <ee:set-variable variableName="httpStatus"><![CDATA[401]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            <flow-ref name="logging-error-subflow" doc:name="Log Error"/>
+        </on-error-propagate>
+
+        <!-- Custom Not Found Error -->
+        <on-error-propagate type="APP:NOT_FOUND" doc:name="On Error - App Not Found">
+            <ee:transform doc:name="Transform App Not Found Error">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    correlationId: correlationId,
+    errorCode: "CLIENT:NOT_FOUND",
+    message: error.description default "Customer not found in Salesforce",
+    timestamp: now()
+}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables>
+                    <ee:set-variable variableName="httpStatus"><![CDATA[404]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            <flow-ref name="logging-error-subflow" doc:name="Log Error"/>
+        </on-error-propagate>
+
+        <!-- Custom Validation Error -->
+        <on-error-propagate type="APP:VALIDATION" doc:name="On Error - App Validation">
+            <ee:transform doc:name="Transform App Validation Error">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    correlationId: correlationId,
+    errorCode: "CLIENT:VALIDATION",
+    message: error.description default "Request validation failed",
+    timestamp: now()
+}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables>
+                    <ee:set-variable variableName="httpStatus"><![CDATA[400]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            <flow-ref name="logging-error-subflow" doc:name="Log Error"/>
+        </on-error-propagate>
+
+        <!-- ============================================ -->
+        <!-- SERVER ERRORS - 5xx                          -->
+        <!-- ============================================ -->
+
+        <!-- Salesforce Connectivity Errors -->
+        <on-error-propagate type="SALESFORCE:CONNECTIVITY, SALESFORCE:INVALID_SESSION" doc:name="On Error - Salesforce Connectivity">
+            <ee:transform doc:name="Transform Salesforce Connectivity Error">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    correlationId: correlationId,
+    errorCode: "SERVER:SALESFORCE",
+    message: "Unable to connect to Salesforce - Please try again later",
+    timestamp: now()
+}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables>
+                    <ee:set-variable variableName="httpStatus"><![CDATA[503]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            <flow-ref name="logging-error-subflow" doc:name="Log Error"/>
+        </on-error-propagate>
+
+        <!-- Salesforce Not Found -->
+        <on-error-propagate type="SALESFORCE:NOT_FOUND" doc:name="On Error - Salesforce Not Found">
+            <ee:transform doc:name="Transform Salesforce Not Found Error">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    correlationId: correlationId,
+    errorCode: "CLIENT:NOT_FOUND",
+    message: error.description default "Record not found in Salesforce",
+    timestamp: now()
+}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables>
+                    <ee:set-variable variableName="httpStatus"><![CDATA[404]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            <flow-ref name="logging-error-subflow" doc:name="Log Error"/>
+        </on-error-propagate>
+
+        <!-- Salesforce Invalid Input -->
+        <on-error-propagate type="SALESFORCE:INVALID_INPUT" doc:name="On Error - Salesforce Invalid Input">
+            <ee:transform doc:name="Transform Salesforce Invalid Input Error">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    correlationId: correlationId,
+    errorCode: "CLIENT:VALIDATION",
+    message: error.description default "Invalid data provided for Salesforce operation",
+    timestamp: now()
+}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables>
+                    <ee:set-variable variableName="httpStatus"><![CDATA[400]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            <flow-ref name="logging-error-subflow" doc:name="Log Error"/>
+        </on-error-propagate>
+
+        <!-- Salesforce Limit Exceeded -->
+        <on-error-propagate type="SALESFORCE:LIMIT_EXCEEDED" doc:name="On Error - Salesforce Limit Exceeded">
+            <ee:transform doc:name="Transform Salesforce Limit Exceeded Error">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    correlationId: correlationId,
+    errorCode: "SERVER:SALESFORCE",
+    message: "Salesforce API limit exceeded - Please try again later",
+    timestamp: now()
+}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables>
+                    <ee:set-variable variableName="httpStatus"><![CDATA[429]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            <flow-ref name="logging-error-subflow" doc:name="Log Error"/>
+        </on-error-propagate>
+
+        <!-- Timeout Errors -->
+        <on-error-propagate type="SALESFORCE:TIMEOUT, HTTP:TIMEOUT" doc:name="On Error - Timeout">
+            <ee:transform doc:name="Transform Timeout Error">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    correlationId: correlationId,
+    errorCode: "SERVER:TIMEOUT",
+    message: "Request timed out - Please try again later",
+    timestamp: now()
+}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables>
+                    <ee:set-variable variableName="httpStatus"><![CDATA[504]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            <flow-ref name="logging-error-subflow" doc:name="Log Error"/>
+        </on-error-propagate>
+
+        <!-- Generic Salesforce Errors -->
+        <on-error-propagate type="SALESFORCE:*" doc:name="On Error - Salesforce Generic">
+            <ee:transform doc:name="Transform Salesforce Generic Error">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    correlationId: correlationId,
+    errorCode: "SERVER:SALESFORCE",
+    message: "Salesforce operation failed - " ++ (error.description default "Unknown error"),
+    timestamp: now()
+}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables>
+                    <ee:set-variable variableName="httpStatus"><![CDATA[500]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            <flow-ref name="logging-error-subflow" doc:name="Log Error"/>
+        </on-error-propagate>
+
+        <!-- Catch All - Unknown Errors -->
+        <on-error-propagate type="ANY" doc:name="On Error - Unknown">
+            <ee:transform doc:name="Transform Unknown Error">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    correlationId: correlationId,
+    errorCode: "SERVER:UNKNOWN",
+    message: "An unexpected error occurred - Please contact support",
+    timestamp: now()
+}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables>
+                    <ee:set-variable variableName="httpStatus"><![CDATA[500]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+            <flow-ref name="logging-error-subflow" doc:name="Log Error"/>
+        </on-error-propagate>
+
+    </error-handler>
+
+</mule>

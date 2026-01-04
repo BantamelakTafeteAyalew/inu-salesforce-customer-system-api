@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- ============================================ -->
+    <!-- LOGGING SUBFLOWS                             -->
+    <!-- Centralized logging for observability        -->
+    <!-- ============================================ -->
+
+    <!-- Initialize Logging Context -->
+    <sub-flow name="logging-init-subflow" doc:name="Initialize Logging Context">
+        <set-variable variableName="startTime" value="#[now()]" doc:name="Set Start Time"/>
+        <set-variable variableName="requestId" value="#[correlationId]" doc:name="Set Request ID"/>
+        <logger level="DEBUG" 
+                message="Logging context initialized - correlationId: #[correlationId]" 
+                doc:name="Log Init"/>
+    </sub-flow>
+
+    <!-- Log Incoming Request -->
+    <sub-flow name="logging-request-subflow" doc:name="Log Request">
+        <logger level="INFO" 
+                message='#["REQUEST | correlationId=" ++ correlationId ++ " | method=" ++ (attributes.method default "N/A") ++ " | path=" ++ (attributes.requestPath default "N/A") ++ " | clientIP=" ++ (attributes.remoteAddress default "N/A")]' 
+                doc:name="Log Request"/>
+    </sub-flow>
+
+    <!-- Log Outgoing Response -->
+    <sub-flow name="logging-response-subflow" doc:name="Log Response">
+        <ee:transform doc:name="Calculate Duration">
+            <ee:variables>
+                <ee:set-variable variableName="duration"><![CDATA[%dw 2.0
+output application/java
+import * from dw::core::Periods
+---
+(now() - vars.startTime) as Number {unit: "milliseconds"}]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        <logger level="INFO" 
+                message='#["RESPONSE | correlationId=" ++ correlationId ++ " | status=" ++ (vars.httpStatus default 200) ++ " | duration=" ++ vars.duration ++ "ms"]' 
+                doc:name="Log Response"/>
+    </sub-flow>
+
+    <!-- Log Error -->
+    <sub-flow name="logging-error-subflow" doc:name="Log Error">
+        <logger level="ERROR" 
+                message='#["ERROR | correlationId=" ++ correlationId ++ " | errorType=" ++ (error.errorType.identifier default "UNKNOWN") ++ " | message=" ++ (error.description default "No description")]' 
+                doc:name="Log Error"/>
+    </sub-flow>
+
+    <!-- Log Salesforce Operation -->
+    <sub-flow name="logging-salesforce-operation-subflow" doc:name="Log Salesforce Operation">
+        <logger level="INFO" 
+                message='#["SALESFORCE | correlationId=" ++ correlationId ++ " | operation=" ++ (vars.sfOperation default "query") ++ " | object=" ++ (vars.sfObject default "Account")]' 
+                doc:name="Log Salesforce Operation"/>
+    </sub-flow>
+
+    <!-- Log Business Event -->
+    <sub-flow name="logging-business-event-subflow" doc:name="Log Business Event">
+        <logger level="INFO" 
+                message='#["BUSINESS_EVENT | correlationId=" ++ correlationId ++ " | event=" ++ (vars.businessEvent default "UNKNOWN") ++ " | details=" ++ (vars.eventDetails default "")]' 
+                doc:name="Log Business Event"/>
+    </sub-flow>
+
+</mule>

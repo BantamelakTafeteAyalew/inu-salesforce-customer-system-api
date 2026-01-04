@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- ============================================ -->
+    <!-- ERROR MAPPING SUBFLOWS                       -->
+    <!-- Reusable error transformation logic          -->
+    <!-- ============================================ -->
+
+    <!-- Map Salesforce Account to API Response -->
+    <sub-flow name="map-salesforce-account-subflow" doc:name="Map Salesforce Account">
+        <ee:transform doc:name="Transform Salesforce Account">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+fun mapCustomerType(accType: String) = 
+    if (accType == "Customer - Direct" or accType == "Customer - Channel") "B2B"
+    else if (accType == "Consumer") "B2C"
+    else null
+---
+{
+    salesforceAccountId: payload.Id,
+    accountName: payload.Name,
+    accountStatus: payload.Status__c default payload.AccountStatus__c default "Active",
+    industry: payload.Industry,
+    customerType: mapCustomerType(payload.'Type' default ""),
+    primaryContact: if (payload.Contacts.records[0]?) {
+        contactId: payload.Contacts.records[0].Id default null,
+        firstName: payload.Contacts.records[0].FirstName default null,
+        lastName: payload.Contacts.records[0].LastName default null,
+        email: payload.Contacts.records[0].Email default null,
+        phone: payload.Contacts.records[0].Phone default null
+    } else null,
+    createdDate: payload.CreatedDate,
+    lastModifiedDate: payload.LastModifiedDate
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </sub-flow>
+
+    <!-- Map Multiple Salesforce Accounts to API Response -->
+    <sub-flow name="map-salesforce-accounts-subflow" doc:name="Map Salesforce Accounts">
+        <ee:transform doc:name="Transform Salesforce Accounts">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+fun mapCustomerType(accType: String) = 
+    if (accType == "Customer - Direct" or accType == "Customer - Channel") "B2B"
+    else if (accType == "Consumer") "B2C"
+    else null
+---
+payload map (account) -> {
+    salesforceAccountId: account.Id,
+    accountName: account.Name,
+    accountStatus: account.Status__c default account.AccountStatus__c default "Active",
+    industry: account.Industry,
+    customerType: mapCustomerType(account.'Type' default ""),
+    primaryContact: if (account.Contacts.records[0]?) {
+        contactId: account.Contacts.records[0].Id default null,
+        firstName: account.Contacts.records[0].FirstName default null,
+        lastName: account.Contacts.records[0].LastName default null,
+        email: account.Contacts.records[0].Email default null,
+        phone: account.Contacts.records[0].Phone default null
+    } else null,
+    createdDate: account.CreatedDate,
+    lastModifiedDate: account.LastModifiedDate
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </sub-flow>
+
+    <!-- Build Error Response -->
+    <sub-flow name="build-error-response-subflow" doc:name="Build Error Response">
+        <ee:transform doc:name="Build Error Response">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    correlationId: correlationId,
+    errorCode: vars.errorCode default "SERVER:UNKNOWN",
+    message: vars.errorMessage default "An unexpected error occurred",
+    timestamp: now()
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </sub-flow>
+
+    <!-- Validate Account ID Format -->
+    <sub-flow name="validate-account-id-subflow" doc:name="Validate Account ID">
+        <choice doc:name="Validate Account ID Format">
+            <when expression="#[isEmpty(vars.salesforceAccountId) or sizeOf(vars.salesforceAccountId) &lt; 15]">
+                <raise-error type="APP:VALIDATION" description="Invalid Salesforce Account ID format" doc:name="Raise Validation Error"/>
+            </when>
+        </choice>
+    </sub-flow>
+
+    <!-- Validate Create Customer Request -->
+    <sub-flow name="validate-create-customer-request-subflow" doc:name="Validate Create Customer Request">
+        <choice doc:name="Validate Required Fields">
+            <when expression="#[isEmpty(payload.accountName)]">
+                <raise-error type="APP:VALIDATION" description="Account name is required" doc:name="Raise Validation Error"/>
+            </when>
+        </choice>
+    </sub-flow>
+
+</mule>

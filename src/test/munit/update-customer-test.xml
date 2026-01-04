@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- ============================================ -->
+    <!-- UPDATE CUSTOMER TEST SUITE                   -->
+    <!-- ============================================ -->
+    <munit:config name="update-customer-test.xml"/>
+
+    <!-- ============================================ -->
+    <!-- TEST: Update Customer - Success              -->
+    <!-- ============================================ -->
+    <munit:test name="update-customer-success-test" 
+                description="Test PATCH /customers/{id} updates customer successfully">
+        
+        <munit:behavior>
+            <!-- Set URI parameters and payload -->
+            <munit-tools:set-event>
+                <munit-tools:payload value='#[{
+                    "accountStatus": "Inactive",
+                    "industry": "Finance"
+                }]'/>
+                <munit-tools:attributes value='#[{
+                    "uriParams": {
+                        "salesforceAccountId": "001XXXXXXXXXXXXXXX"
+                    }
+                }]'/>
+            </munit-tools:set-event>
+            
+            <!-- Mock Salesforce Query to check existence -->
+            <munit-tools:mock-when processor="salesforce:query">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Check Account Exists"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value='#[[{
+                        "Id": "001XXXXXXXXXXXXXXX"
+                    }]]'/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+            
+            <!-- Mock Salesforce Update -->
+            <munit-tools:mock-when processor="salesforce:update">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Update Salesforce Account"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value='#[[{
+                        "success": true,
+                        "id": "001XXXXXXXXXXXXXXX",
+                        "errors": []
+                    }]]'/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="update-customer-flow" doc:name="Execute Update Customer Flow"/>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.salesforceAccountId]" is="#[MunitTools::equalTo('001XXXXXXXXXXXXXXX')]" doc:name="Assert Account ID returned"/>
+            <munit-tools:assert-that expression="#[payload.message]" is="#[MunitTools::containsString('successfully')]" doc:name="Assert success message"/>
+            <munit-tools:assert-that expression="#[vars.httpStatus]" is="#[MunitTools::equalTo(200)]" doc:name="Assert HTTP Status 200"/>
+        </munit:validation>
+        
+    </munit:test>
+
+    <!-- ============================================ -->
+    <!-- TEST: Update Customer - Not Found            -->
+    <!-- ============================================ -->
+    <munit:test name="update-customer-not-found-test" 
+                description="Test PATCH /customers/{id} returns 404 when customer not found"
+                expectedErrorType="APP:NOT_FOUND">
+        
+        <munit:behavior>
+            <!-- Set URI parameters and payload -->
+            <munit-tools:set-event>
+                <munit-tools:payload value='#[{
+                    "accountStatus": "Inactive"
+                }]'/>
+                <munit-tools:attributes value='#[{
+                    "uriParams": {
+                        "salesforceAccountId": "001NONEXISTENT0000"
+                    }
+                }]'/>
+            </munit-tools:set-event>
+            
+            <!-- Mock Salesforce Query returning empty -->
+            <munit-tools:mock-when processor="salesforce:query">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Check Account Exists"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[[]]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="update-customer-flow" doc:name="Execute Update Customer Flow"/>
+        </munit:execution>
+        
+    </munit:test>
+
+    <!-- ============================================ -->
+    <!-- TEST: Update Customer - Invalid ID Format    -->
+    <!-- ============================================ -->
+    <munit:test name="update-customer-invalid-id-test" 
+                description="Test PATCH /customers/{id} returns 400 for invalid ID format"
+                expectedErrorType="APP:VALIDATION">
+        
+        <munit:behavior>
+            <!-- Set invalid URI parameters -->
+            <munit-tools:set-event>
+                <munit-tools:payload value='#[{
+                    "accountStatus": "Inactive"
+                }]'/>
+                <munit-tools:attributes value='#[{
+                    "uriParams": {
+                        "salesforceAccountId": "bad"
+                    }
+                }]'/>
+            </munit-tools:set-event>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="update-customer-flow" doc:name="Execute Update Customer Flow"/>
+        </munit:execution>
+        
+    </munit:test>
+
+    <!-- ============================================ -->
+    <!-- TEST: Update Customer - Salesforce Error     -->
+    <!-- ============================================ -->
+    <munit:test name="update-customer-salesforce-error-test" 
+                description="Test PATCH /customers/{id} handles Salesforce update failure"
+                expectedErrorType="APP:VALIDATION">
+        
+        <munit:behavior>
+            <!-- Set URI parameters and payload -->
+            <munit-tools:set-event>
+                <munit-tools:payload value='#[{
+                    "accountStatus": "InvalidStatus"
+                }]'/>
+                <munit-tools:attributes value='#[{
+                    "uriParams": {
+                        "salesforceAccountId": "001XXXXXXXXXXXXXXX"
+                    }
+                }]'/>
+            </munit-tools:set-event>
+            
+            <!-- Mock Salesforce Query to check existence -->
+            <munit-tools:mock-when processor="salesforce:query">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Check Account Exists"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value='#[[{
+                        "Id": "001XXXXXXXXXXXXXXX"
+                    }]]'/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+            
+            <!-- Mock Salesforce Update with failure -->
+            <munit-tools:mock-when processor="salesforce:update">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Update Salesforce Account"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value='#[[{
+                        "success": false,
+                        "id": null,
+                        "errors": [{
+                            "statusCode": "INVALID_FIELD_VALUE",
+                            "message": "Invalid status value"
+                        }]
+                    }]]'/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="update-customer-flow" doc:name="Execute Update Customer Flow"/>
+        </munit:execution>
+        
+    </munit:test>
+
+    <!-- ============================================ -->
+    <!-- TEST: Update Customer - Partial Update       -->
+    <!-- ============================================ -->
+    <munit:test name="update-customer-partial-update-test" 
+                description="Test PATCH /customers/{id} supports partial updates">
+        
+        <munit:behavior>
+            <!-- Set URI parameters with only one field to update -->
+            <munit-tools:set-event>
+                <munit-tools:payload value='#[{
+                    "industry": "Healthcare"
+                }]'/>
+                <munit-tools:attributes value='#[{
+                    "uriParams": {
+                        "salesforceAccountId": "001XXXXXXXXXXXXXXX"
+                    }
+                }]'/>
+            </munit-tools:set-event>
+            
+            <!-- Mock Salesforce Query to check existence -->
+            <munit-tools:mock-when processor="salesforce:query">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Check Account Exists"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value='#[[{
+                        "Id": "001XXXXXXXXXXXXXXX"
+                    }]]'/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+            
+            <!-- Mock Salesforce Update -->
+            <munit-tools:mock-when processor="salesforce:update">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Update Salesforce Account"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value='#[[{
+                        "success": true,
+                        "id": "001XXXXXXXXXXXXXXX",
+                        "errors": []
+                    }]]'/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="update-customer-flow" doc:name="Execute Update Customer Flow"/>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.salesforceAccountId]" is="#[MunitTools::equalTo('001XXXXXXXXXXXXXXX')]" doc:name="Assert Account ID returned"/>
+            <munit-tools:assert-that expression="#[vars.httpStatus]" is="#[MunitTools::equalTo(200)]" doc:name="Assert HTTP Status 200"/>
+        </munit:validation>
+        
+    </munit:test>
+
+    <!-- ============================================ -->
+    <!-- TEST: Update Customer - Connectivity Error   -->
+    <!-- ============================================ -->
+    <munit:test name="update-customer-connectivity-error-test" 
+                description="Test PATCH /customers/{id} handles Salesforce connectivity error"
+                expectedErrorType="SALESFORCE:CONNECTIVITY">
+        
+        <munit:behavior>
+            <!-- Set URI parameters and payload -->
+            <munit-tools:set-event>
+                <munit-tools:payload value='#[{
+                    "accountStatus": "Active"
+                }]'/>
+                <munit-tools:attributes value='#[{
+                    "uriParams": {
+                        "salesforceAccountId": "001XXXXXXXXXXXXXXX"
+                    }
+                }]'/>
+            </munit-tools:set-event>
+            
+            <!-- Mock Salesforce Query throwing connectivity error -->
+            <munit-tools:mock-when processor="salesforce:query">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Check Account Exists"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:error typeId="SALESFORCE:CONNECTIVITY" exception="#[java!java::lang::RuntimeException::new('Connection failed')]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="update-customer-flow" doc:name="Execute Update Customer Flow"/>
+        </munit:execution>
+        
+    </munit:test>
+
+</mule>

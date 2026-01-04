@@ -1,0 +1,37 @@
+# ============================================
+# Salesforce Customer System API - Configuration
+# ============================================
+# Environment: ${mule.env}
+# ============================================
+
+# HTTP Listener Configuration
+http:
+  listener:
+    host: "0.0.0.0"
+    port: "8081"
+    basePath: "/api/v1"
+
+# API Configuration
+api:
+  id: "${api.id}"
+  name: "inu-salesforce-customer-system-api"
+  version: "v1"
+
+# Salesforce Configuration (Non-Sensitive)
+salesforce:
+  tokenEndpoint: "https://login.salesforce.com/services/oauth2/token"
+  readTimeout: "30000"
+  connectionTimeout: "30000"
+  reconnection:
+    frequency: "3000"
+    attempts: "5"
+
+# Retry Configuration
+retry:
+  maxAttempts: "3"
+  intervalMs: "2000"
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  maskSensitiveData: "true"

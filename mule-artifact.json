@@ -1,0 +1,11 @@
+{
+  "minMuleVersion": "4.9.3",
+  "javaSpecificationVersions": ["17"],
+  "secureProperties": [
+    "salesforce.consumerKey",
+    "salesforce.keystorePassword",
+    "salesforce.username",
+    "apiManager.clientId",
+    "apiManager.clientSecret"
+  ]
+}

@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- ============================================ -->
+    <!-- GET CUSTOMERS TEST SUITE                     -->
+    <!-- ============================================ -->
+    <munit:config name="get-customers-test.xml"/>
+
+    <!-- ============================================ -->
+    <!-- TEST: Get All Customers - Success            -->
+    <!-- ============================================ -->
+    <munit:test name="get-customers-success-test" 
+                description="Test GET /customers returns list of customers successfully">
+        
+        <munit:behavior>
+            <!-- Mock Salesforce Query -->
+            <munit-tools:mock-when processor="salesforce:query">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Query Salesforce Accounts"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value='#[[{
+                        "Id": "001XXXXXXXXXXXXXXX",
+                        "Name": "Acme Corporation",
+                        "Industry": "Technology",
+                        "Type": "Customer - Direct",
+                        "Status__c": "Active",
+                        "CreatedDate": "2024-01-15T10:30:00.000Z",
+                        "LastModifiedDate": "2024-06-20T14:45:00.000Z",
+                        "Contacts": {
+                            "records": [{
+                                "Id": "003XXXXXXXXXXXXXXX",
+                                "FirstName": "John",
+                                "LastName": "Doe",
+                                "Email": "john.doe@acme.com",
+                                "Phone": "+1-555-555-5555"
+                            }]
+                        }
+                    }]]'/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="get-customers-flow" doc:name="Execute Get Customers Flow"/>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[sizeOf(payload)]" is="#[MunitTools::greaterThanOrEqualTo(1)]" doc:name="Assert at least one customer returned"/>
+            <munit-tools:assert-that expression="#[payload[0].salesforceAccountId]" is="#[MunitTools::equalTo('001XXXXXXXXXXXXXXX')]" doc:name="Assert Account ID"/>
+            <munit-tools:assert-that expression="#[payload[0].accountName]" is="#[MunitTools::equalTo('Acme Corporation')]" doc:name="Assert Account Name"/>
+            <munit-tools:assert-that expression="#[payload[0].industry]" is="#[MunitTools::equalTo('Technology')]" doc:name="Assert Industry"/>
+            <munit-tools:assert-that expression="#[payload[0].customerType]" is="#[MunitTools::equalTo('B2B')]" doc:name="Assert Customer Type"/>
+        </munit:validation>
+        
+    </munit:test>
+
+    <!-- ============================================ -->
+    <!-- TEST: Get Customers - Empty Result           -->
+    <!-- ============================================ -->
+    <munit:test name="get-customers-empty-result-test" 
+                description="Test GET /customers returns empty array when no customers found">
+        
+        <munit:behavior>
+            <!-- Mock Salesforce Query returning empty -->
+            <munit-tools:mock-when processor="salesforce:query">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Query Salesforce Accounts"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[[]]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="get-customers-flow" doc:name="Execute Get Customers Flow"/>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[sizeOf(payload)]" is="#[MunitTools::equalTo(0)]" doc:name="Assert empty array returned"/>
+        </munit:validation>
+        
+    </munit:test>
+
+    <!-- ============================================ -->
+    <!-- TEST: Get Customers - With Email Filter      -->
+    <!-- ============================================ -->
+    <munit:test name="get-customers-with-email-filter-test" 
+                description="Test GET /customers with email query parameter">
+        
+        <munit:behavior>
+            <!-- Set query parameters -->
+            <munit-tools:set-event>
+                <munit-tools:attributes value='#[{
+                    "queryParams": {
+                        "email": "john.doe@acme.com"
+                    }
+                }]'/>
+            </munit-tools:set-event>
+            
+            <!-- Mock Salesforce Query -->
+            <munit-tools:mock-when processor="salesforce:query">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Query Salesforce Accounts"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value='#[[{
+                        "Id": "001XXXXXXXXXXXXXXX",
+                        "Name": "Acme Corporation",
+                        "Industry": "Technology",
+                        "Type": "Customer - Direct",
+                        "Status__c": "Active",
+                        "CreatedDate": "2024-01-15T10:30:00.000Z",
+                        "LastModifiedDate": "2024-06-20T14:45:00.000Z",
+                        "Contacts": {
+                            "records": [{
+                                "Id": "003XXXXXXXXXXXXXXX",
+                                "FirstName": "John",
+                                "LastName": "Doe",
+                                "Email": "john.doe@acme.com",
+                                "Phone": "+1-555-555-5555"
+                            }]
+                        }
+                    }]]'/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="get-customers-flow" doc:name="Execute Get Customers Flow"/>
+        </munit:execution>
+        
+        <munit:validation>
+            <munit-tools:assert-that expression="#[sizeOf(payload)]" is="#[MunitTools::equalTo(1)]" doc:name="Assert one customer returned"/>
+            <munit-tools:assert-that expression="#[payload[0].primaryContact.email]" is="#[MunitTools::equalTo('john.doe@acme.com')]" doc:name="Assert Contact Email"/>
+        </munit:validation>
+        
+    </munit:test>
+
+    <!-- ============================================ -->
+    <!-- TEST: Get Customers - Salesforce Error       -->
+    <!-- ============================================ -->
+    <munit:test name="get-customers-salesforce-error-test" 
+                description="Test GET /customers handles Salesforce connectivity error"
+                expectedErrorType="SALESFORCE:CONNECTIVITY">
+        
+        <munit:behavior>
+            <!-- Mock Salesforce Query throwing error -->
+            <munit-tools:mock-when processor="salesforce:query">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Query Salesforce Accounts"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:error typeId="SALESFORCE:CONNECTIVITY" exception="#[java!java::lang::RuntimeException::new('Connection failed')]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+        
+        <munit:execution>
+            <flow-ref name="get-customers-flow" doc:name="Execute Get Customers Flow"/>
+        </munit:execution>
+        
+    </munit:test>
+
+</mule>

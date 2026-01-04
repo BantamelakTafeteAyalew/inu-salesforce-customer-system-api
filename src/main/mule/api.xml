@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- ============================================ -->
+    <!-- MAIN API FLOW                                -->
+    <!-- Entry point for all API requests             -->
+    <!-- ============================================ -->
+    <flow name="api-main" doc:name="API Main Flow">
+        <http:listener config-ref="HTTP_Listener_Config" path="${http.listener.basePath}/*" doc:name="HTTP Listener">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body><![CDATA[#[payload]]]></http:body>
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:error-response>
+        </http:listener>
+        
+        <!-- Initialize Correlation ID -->
+        <flow-ref name="logging-init-subflow" doc:name="Initialize Logging Context"/>
+        
+        <!-- Log Request Start -->
+        <flow-ref name="logging-request-subflow" doc:name="Log Request"/>
+        
+        <!-- APIKit Router -->
+        <apikit:router config-ref="api-config" doc:name="APIKit Router"/>
+        
+        <!-- Log Response -->
+        <flow-ref name="logging-response-subflow" doc:name="Log Response"/>
+        
+        <error-handler ref="global-error-handler"/>
+    </flow>
+
+    <!-- ============================================ -->
+    <!-- API CONSOLE FLOW                             -->
+    <!-- Interactive API documentation                -->
+    <!-- ============================================ -->
+    <flow name="api-console" doc:name="API Console Flow">
+        <http:listener config-ref="HTTP_Listener_Config" path="/console/*" doc:name="HTTP Listener Console">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body><![CDATA[#[payload]]]></http:body>
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:error-response>
+        </http:listener>
+        
+        <apikit:console config-ref="api-config" doc:name="APIKit Console"/>
+    </flow>
+
+    <!-- ============================================ -->
+    <!-- APIKIT GENERATED FLOWS                       -->
+    <!-- Routes to implementation flows               -->
+    <!-- ============================================ -->
+    
+    <!-- GET /customers -->
+    <flow name="get:\customers:api-config" doc:name="GET /customers">
+        <flow-ref name="get-customers-flow" doc:name="Get Customers Implementation"/>
+    </flow>
+
+    <!-- POST /customers -->
+    <flow name="post:\customers:api-config" doc:name="POST /customers">
+        <flow-ref name="create-customer-flow" doc:name="Create Customer Implementation"/>
+    </flow>
+
+    <!-- GET /customers/{salesforceAccountId} -->
+    <flow name="get:\customers\(salesforceAccountId):api-config" doc:name="GET /customers/{salesforceAccountId}">
+        <flow-ref name="get-customer-by-id-flow" doc:name="Get Customer By ID Implementation"/>
+    </flow>
+
+    <!-- PATCH /customers/{salesforceAccountId} -->
+    <flow name="patch:\customers\(salesforceAccountId):api-config" doc:name="PATCH /customers/{salesforceAccountId}">
+        <flow-ref name="update-customer-flow" doc:name="Update Customer Implementation"/>
+    </flow>
+
+</mule>

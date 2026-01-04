@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+        http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+
+    <!-- ============================================ -->
+    <!-- GET CUSTOMER BY ID FLOW                      -->
+    <!-- Retrieves a single customer by Account ID   -->
+    <!-- ============================================ -->
+    <flow name="get-customer-by-id-flow" doc:name="Get Customer By ID Flow">
+        
+        <!-- Extract and validate Account ID -->
+        <set-variable variableName="salesforceAccountId" value="#[attributes.uriParams.salesforceAccountId]" doc:name="Set Account ID"/>
+        <flow-ref name="validate-account-id-subflow" doc:name="Validate Account ID"/>
+        
+        <!-- Set operation context for logging -->
+        <set-variable variableName="sfOperation" value="query" doc:name="Set SF Operation"/>
+        <set-variable variableName="sfObject" value="Account" doc:name="Set SF Object"/>
+        <flow-ref name="logging-salesforce-operation-subflow" doc:name="Log Salesforce Operation"/>
+        
+        <!-- Query Salesforce for specific Account -->
+        <salesforce:query config-ref="Salesforce_Config" doc:name="Query Salesforce Account">
+            <salesforce:salesforce-query><![CDATA[SELECT Id, Name, Industry, Type, Status__c, AccountStatus__c, CreatedDate, LastModifiedDate, 
+(SELECT Id, FirstName, LastName, Email, Phone FROM Contacts ORDER BY CreatedDate DESC LIMIT 1) 
+FROM Account 
+WHERE Id = ':accountId']]></salesforce:salesforce-query>
+            <salesforce:parameters><![CDATA[#[{
+    accountId: vars.salesforceAccountId
+}]]]></salesforce:parameters>
+        </salesforce:query>
+        
+        <!-- Check if customer exists -->
+        <choice doc:name="Check Customer Exists">
+            <when expression="#[isEmpty(payload)]">
+                <raise-error type="APP:NOT_FOUND" description="#['Customer with ID ' ++ vars.salesforceAccountId ++ ' not found in Salesforce']" doc:name="Raise Not Found Error"/>
+            </when>
+            <otherwise>
+                <!-- Get first record -->
+                <set-payload value="#[payload[0]]" doc:name="Get First Record"/>
+                
+                <!-- Transform to API response format -->
+                <flow-ref name="map-salesforce-account-subflow" doc:name="Map Salesforce Account"/>
+                
+                <!-- Set business event for logging -->
+                <set-variable variableName="businessEvent" value="CUSTOMER_RETRIEVED" doc:name="Set Business Event"/>
+                <set-variable variableName="eventDetails" value="#['accountId=' ++ vars.salesforceAccountId]" doc:name="Set Event Details"/>
+                <flow-ref name="logging-business-event-subflow" doc:name="Log Business Event"/>
+            </otherwise>
+        </choice>
+        
+    </flow>
+
+</mule>

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit"
+      xmlns:api-gateway="http://www.mulesoft.org/schema/mule/api-gateway"
+      xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+      xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties"
+      xmlns:os="http://www.mulesoft.org/schema/mule/os"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd
+        http://www.mulesoft.org/schema/mule/api-gateway http://www.mulesoft.org/schema/mule/api-gateway/current/mule-api-gateway.xsd
+        http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+        http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd
+        http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- ============================================ -->
+    <!-- GLOBAL PROPERTIES                            -->
+    <!-- ============================================ -->
+    <global-property name="mule.env" value="dev" doc:name="Environment Property"/>
+    <global-property name="encryption.key" value="${encryption.key}" doc:name="Encryption Key"/>
+
+    <!-- ============================================ -->
+    <!-- CONFIGURATION PROPERTIES                     -->
+    <!-- ============================================ -->
+    <configuration-properties file="application.yaml" doc:name="Application Properties"/>
+    
+    <secure-properties:config name="Secure_Properties_Config" 
+        file="application-secure.yaml" 
+        key="${encryption.key}"
+        doc:name="Secure Properties Config">
+        <secure-properties:encrypt algorithm="AES" mode="CBC"/>
+    </secure-properties:config>
+
+    <!-- ============================================ -->
+    <!-- HTTP LISTENER CONFIGURATION                  -->
+    <!-- ============================================ -->
+    <http:listener-config name="HTTP_Listener_Config" doc:name="HTTP Listener Config">
+        <http:listener-connection host="${http.listener.host}" port="${http.listener.port}"/>
+    </http:listener-config>
+
+    <!-- ============================================ -->
+    <!-- APIKIT CONFIGURATION                         -->
+    <!-- ============================================ -->
+    <apikit:config name="api-config" 
+        api="api/inu-salesforce-customer-system-api.raml" 
+        outboundHeadersMapName="outboundHeaders" 
+        httpStatusVarName="httpStatus"
+        doc:name="APIKit Config"/>
+
+    <!-- ============================================ -->
+    <!-- API AUTODISCOVERY                            -->
+    <!-- ============================================ -->
+    <api-gateway:autodiscovery apiId="${api.id}" flowRef="api-main" doc:name="API Autodiscovery"/>
+
+    <!-- ============================================ -->
+    <!-- SALESFORCE CONNECTOR CONFIGURATION           -->
+    <!-- ============================================ -->
+    <salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config">
+        <salesforce:oauth-jwt-connection 
+            consumerKey="${secure::salesforce.consumerKey}"
+            keyStorePath="${secure::salesforce.keystorePath}"
+            storePassword="${secure::salesforce.keystorePassword}"
+            certificateAlias="${secure::salesforce.certificateAlias}"
+            principal="${secure::salesforce.username}"
+            tokenEndpoint="${salesforce.tokenEndpoint}"
+            readTimeout="${salesforce.readTimeout}"
+            connectionTimeout="${salesforce.connectionTimeout}">
+            <reconnection>
+                <reconnect frequency="${salesforce.reconnection.frequency}" count="${salesforce.reconnection.attempts}"/>
+            </reconnection>
+        </salesforce:oauth-jwt-connection>
+    </salesforce:sfdc-config>
+
+    <!-- ============================================ -->
+    <!-- OBJECT STORE CONFIGURATION                   -->
+    <!-- ============================================ -->
+    <os:object-store name="Customer_Cache_ObjectStore" 
+        persistent="false" 
+        maxEntries="500" 
+        entryTtl="30" 
+        entryTtlUnit="MINUTES"
+        expirationInterval="5"
+        expirationIntervalUnit="MINUTES"
+        doc:name="Customer Cache Object Store"/>
+
+</mule>

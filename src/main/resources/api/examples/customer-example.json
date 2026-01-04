@@ -1,0 +1,16 @@
+{
+  "salesforceAccountId": "001XXXXXXXXXXXXXXX",
+  "accountName": "Acme Corporation",
+  "accountStatus": "Active",
+  "industry": "Technology",
+  "customerType": "B2B",
+  "primaryContact": {
+    "contactId": "003XXXXXXXXXXXXXXX",
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "john.doe@acme.com",
+    "phone": "+1-555-555-5555"
+  },
+  "createdDate": "2024-01-15T10:30:00Z",
+  "lastModifiedDate": "2024-06-20T14:45:00Z"
+}

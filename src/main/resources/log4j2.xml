@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Configuration status="WARN">
+
+    <!-- ============================================ -->
+    <!-- Salesforce Customer System API - Log4j2     -->
+    <!-- ============================================ -->
+
+    <Appenders>
+        <!-- Rolling File Appender -->
+        <RollingFile name="file" 
+                     fileName="${sys:mule.home}${sys:file.separator}logs${sys:file.separator}inu-salesforce-customer-system-api.log"
+                     filePattern="${sys:mule.home}${sys:file.separator}logs${sys:file.separator}inu-salesforce-customer-system-api-%d{yyyy-MM-dd}-%i.log">
+            <PatternLayout pattern="%-5p %d{yyyy-MM-dd HH:mm:ss.SSS} [%t] [correlationId: %X{correlationId}] [processor: %X{processorPath}] %c{1}: %m%n"/>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="10 MB"/>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30"/>
+        </RollingFile>
+        
+        <!-- Console Appender -->
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%-5p %d{yyyy-MM-dd HH:mm:ss.SSS} [%t] [correlationId: %X{correlationId}] %c{1}: %m%n"/>
+        </Console>
+    </Appenders>
+
+    <Loggers>
+        <!-- HTTP Service Loggers -->
+        <AsyncLogger name="org.mule.service.http" level="WARN"/>
+        <AsyncLogger name="org.mule.extension.http" level="WARN"/>
+        
+        <!-- Salesforce Connector Logger -->
+        <AsyncLogger name="com.mulesoft.connector.salesforce" level="WARN"/>
+        
+        <!-- APIKit Logger -->
+        <AsyncLogger name="org.mule.module.apikit" level="WARN"/>
+        
+        <!-- Mule Runtime Logger -->
+        <AsyncLogger name="org.mule.runtime.core.internal.processor.LoggerMessageProcessor" level="INFO"/>
+        
+        <!-- Application Logger -->
+        <AsyncLogger name="com.company.salesforce" level="INFO"/>
+        
+        <!-- Root Logger -->
+        <AsyncRoot level="INFO">
+            <AppenderRef ref="file"/>
+            <AppenderRef ref="Console"/>
+        </AsyncRoot>
+    </Loggers>
+
+</Configuration>

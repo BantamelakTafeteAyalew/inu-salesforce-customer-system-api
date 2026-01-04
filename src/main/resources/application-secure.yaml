@@ -1,0 +1,23 @@
+# ============================================
+# Salesforce Customer System API - Secure Properties
+# ============================================
+# IMPORTANT: All values must be encrypted using the secure properties tool
+# Algorithm: AES, Mode: CBC
+# ============================================
+
+# Salesforce OAuth JWT Credentials
+salesforce:
+  consumerKey: "![encrypted-consumer-key]"
+  keystorePath: "keystore/salesforce-keystore.jks"
+  keystorePassword: "![encrypted-keystore-password]"
+  certificateAlias: "salesforce-cert"
+  username: "![encrypted-username]"
+
+# API Manager Client Credentials
+apiManager:
+  clientId: "![encrypted-client-id]"
+  clientSecret: "![encrypted-client-secret]"
+
+# Encryption Key (provided via VM argument: -Dencryption.key=xxx)
+# encryption:
+#   key: "${encryption.key}"
