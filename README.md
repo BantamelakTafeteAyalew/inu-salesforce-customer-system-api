@@ -1,0 +1,12 @@
+<img width="2452" height="522" alt="3" src="https://github.com/user-attachments/assets/698b8c62-3670-4d0d-b12d-812e64ddd72e" />
+<img width="2303" height="564" alt="6" src="https://github.com/user-attachments/assets/740e0bb5-0a5b-4cb4-8e7f-7ab06530023c" />
+<img width="1676" height="187" alt="5" src="https://github.com/user-attachments/assets/88d559d6-5e53-4c24-b2f3-cfdfa79890e3" />
+<img width="1692" height="383" alt="4" src="https://github.com/user-attachments/assets/ae86fc01-d07e-4f68-913a-d7af7bfa206d" />
+<img width="339" height="902" alt="22" src="https://github.com/user-attachments/assets/af835112-4ab9-45e3-a952-e877c9f94459" />
+<img width="350" height="1122" alt="11" src="https://github.com/user-attachments/assets/ad209d59-d6f8-4e31-9cd1-d046d21086f3" />
+<img width="562" height="1504" alt="t" src="https://github.com/user-attachments/assets/6a21be69-0277-450e-931e-7e4ff8f8c3d6" />
+<img width="303" height="2492" alt="inu-salesforce-customer-system-api2" src="https://github.com/user-attachments/assets/488979e7-9304-4baa-bac5-1605f98e59d1" />
+<img width="603" height="1313" alt="inu-salesforce-customer-system-api1" src="https://github.com/user-attachments/assets/0e2a6dbd-e453-4760-be20-7cb730cbe714" />
+<img width="562" height="1805" alt="tttt" src="https://github.com/user-attachments/assets/c156de57-dea1-4a6e-94ad-cb4381e75183" />
+<img width="812" height="1194" alt="ttt" src="https://github.com/user-attachments/assets/7db0b2c0-80d5-4841-9345-c3990db85d7c" />
+<img width="951" height="1579" alt="tt" src="https://github.com/user-attachments/assets/f5348f66-d85e-4b5e-ade9-bb79749ed603" />
